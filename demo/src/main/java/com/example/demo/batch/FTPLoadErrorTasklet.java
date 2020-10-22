@@ -17,22 +17,11 @@ import org.springframework.beans.factory.InitializingBean;
 import org.springframework.core.io.Resource;
 import org.springframework.util.Assert;
 
-public class FTPLoadTasklet  implements Tasklet, InitializingBean {
-	private static final Logger log = LoggerFactory.getLogger(FTPLoadTasklet.class);
+public class FTPLoadErrorTasklet  implements Tasklet, InitializingBean {
+	private static final Logger log = LoggerFactory.getLogger(FTPLoadErrorTasklet.class);
     private Resource source;
     public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
-        File dir = source.getFile();
-        Assert.state(dir.isDirectory(), "isDirectory");
-        File[] files = dir.listFiles(new FilenameFilter() {
-            public boolean accept(File file, String name) {
-            	return name.toLowerCase().endsWith(".csv");
-            }
-        });
-        if(files.length % 2 == 1) throw new UnexpectedJobExecutionException("Error forzado");
-        for (int i = 0; i < files.length; i++) {
-        	Files.copy(files[i].toPath(), Paths.get("src/main/resources/" + files[i].getName()), StandardCopyOption.REPLACE_EXISTING);
-        	log.info("Copy " + files[i].getName());
-        }
+        log.error("Trato el error en FTP");
         return RepeatStatus.FINISHED;
     }
     public void setDirectoryResource(Resource directory) { this.source = directory; }
