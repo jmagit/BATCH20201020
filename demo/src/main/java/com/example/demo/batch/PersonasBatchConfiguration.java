@@ -47,6 +47,16 @@ public class PersonasBatchConfiguration {
 					}
 				}).build();
 	}
+	public FlatFileItemReader<PersonaDTO> personaCSV2ItemReader(String fname) {
+		return new FlatFileItemReaderBuilder<PersonaDTO>().name("personaCSVItemReader")
+				.resource(new ClassPathResource(fname)).linesToSkip(1).delimited()
+				.names(new String[] { "id", "correo", "nombre", "apellidos", "sexo", "ip" })
+				.fieldSetMapper(new BeanWrapperFieldSetMapper<PersonaDTO>() {
+					{
+						setTargetType(PersonaDTO.class);
+					}
+				}).build();
+	}
 
 	@Autowired
 	public PersonaItemProcessor personaItemProcessor;
@@ -62,6 +72,18 @@ public class PersonasBatchConfiguration {
 	public Step importCSV2DBStep1(JdbcBatchItemWriter<Persona> personaDBItemWriter) {
 		return stepBuilderFactory.get("importCSV2DBStep1").<PersonaDTO, Persona>chunk(10)
 				.reader(personaCSVItemReader("personas-1.csv")).processor(personaItemProcessor)
+				.writer(personaDBItemWriter).build();
+	}
+	@Bean
+	public Step importCSV2DBStep2(JdbcBatchItemWriter<Persona> personaDBItemWriter) {
+		return stepBuilderFactory.get("importCSV2DBStep2").<PersonaDTO, Persona>chunk(10)
+				.reader(personaCSVItemReader("personas-2.csv")).processor(personaItemProcessor)
+				.writer(personaDBItemWriter).build();
+	}
+	@Bean
+	public Step importCSV2DBStep3(JdbcBatchItemWriter<Persona> personaDBItemWriter) {
+		return stepBuilderFactory.get("importCSV2DBStep3").<PersonaDTO, Persona>chunk(10)
+				.reader(personaCSV2ItemReader("personas-3.csv")).processor(personaItemProcessor)
 				.writer(personaDBItemWriter).build();
 	}
 
@@ -103,11 +125,13 @@ public class PersonasBatchConfiguration {
 
 	@Bean
 	public Job personasJob(PersonasJobListener listener, Step importCSV2DBStep1, 
-			Step exportDB2CSVStep) {
+			Step importCSV2DBStep2, Step importCSV2DBStep3, Step exportDB2CSVStep) {
 		return jobBuilderFactory.get("personasJob")
 				.incrementer(new RunIdIncrementer())
-				//.listener(listener)
+				.listener(listener)
 				.start(importCSV2DBStep1)
+				.next(importCSV2DBStep2)
+				.next(importCSV2DBStep3)
 				.next(exportDB2CSVStep)
 				.build();
 	}
