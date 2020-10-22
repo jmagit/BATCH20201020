@@ -83,7 +83,8 @@ public class PersonasBatchConfiguration {
 	@Bean
 	public Step importCSV2DBStep2(JdbcBatchItemWriter<Persona> personaDBItemWriter) {
 		return stepBuilderFactory.get("importCSV2DBStep2").<PersonaDTO, Persona>chunk(10)
-				.reader(personaCSVItemReader("personas-2.csv")).processor(personaItemProcessor)
+				.reader(personaCSVItemReader("personas-2.csv"))
+				.processor(personaItemProcessor)
 				.writer(personaDBItemWriter).build();
 	}
 	@Bean
