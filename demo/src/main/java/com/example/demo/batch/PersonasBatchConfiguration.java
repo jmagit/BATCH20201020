@@ -39,14 +39,13 @@ public class PersonasBatchConfiguration {
 
 	public FlatFileItemReader<PersonaDTO> personaCSVItemReader(String fname) {
 		return new FlatFileItemReaderBuilder<PersonaDTO>().name("personaCSVItemReader")
-				.resource(new ClassPathResource(fname))
-				.linesToSkip(1)
-				.delimited()
+				.resource(new ClassPathResource(fname)).linesToSkip(1).delimited()
 				.names(new String[] { "id", "nombre", "apellidos", "correo", "sexo", "ip" })
-				.fieldSetMapper(new BeanWrapperFieldSetMapper<PersonaDTO>() { {
+				.fieldSetMapper(new BeanWrapperFieldSetMapper<PersonaDTO>() {
+					{
 						setTargetType(PersonaDTO.class);
-					}})
-				.build();
+					}
+				}).build();
 	}
 
 	@Autowired
@@ -56,28 +55,60 @@ public class PersonasBatchConfiguration {
 	public JdbcBatchItemWriter<Persona> personaDBItemWriter(DataSource dataSource) {
 		return new JdbcBatchItemWriterBuilder<Persona>()
 				.itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>())
-				.sql("INSERT INTO personas VALUES (:id,:nombre,:correo,:ip)")
-				.dataSource(dataSource)
-				.build();
+				.sql("INSERT INTO personas VALUES (:id,:nombre,:correo,:ip)").dataSource(dataSource).build();
 	}
 
 	@Bean
 	public Step importCSV2DBStep1(JdbcBatchItemWriter<Persona> personaDBItemWriter) {
-		return stepBuilderFactory.get("importCSV2DBStep1")
-				.<PersonaDTO, Persona>chunk(10)
-				.reader(personaCSVItemReader("personas-1.csv"))
-				.processor(personaItemProcessor)
-				.writer(personaDBItemWriter)
+		return stepBuilderFactory.get("importCSV2DBStep1").<PersonaDTO, Persona>chunk(10)
+				.reader(personaCSVItemReader("personas-1.csv")).processor(personaItemProcessor)
+				.writer(personaDBItemWriter).build();
+	}
+
+	@Bean
+	JdbcCursorItemReader<Persona> personaDBItemReader(DataSource dataSource) {
+		return new JdbcCursorItemReaderBuilder<Persona>()
+				.name("personaDBItemReader")
+				.sql("SELECT id, nombre, correo, ip FROM personas")
+				.dataSource(dataSource)
+				.rowMapper(new BeanPropertyRowMapper<>(Persona.class))
 				.build();
 	}
 
 	@Bean
-	public Job personasJob(PersonasJobListener listener, Step importCSV2DBStep1) {
-		return jobBuilderFactory
-				.get("personasJob")
+	public FlatFileItemWriter<Persona> personaCSVItemWriter() {
+		return new FlatFileItemWriterBuilder<Persona>()
+				.name("personaCSVItemWriter")
+				.resource(new FileSystemResource("output/outputData.csv"))
+				.lineAggregator(new DelimitedLineAggregator<Persona>() {
+					{
+						setDelimiter(",");
+						setFieldExtractor(new BeanWrapperFieldExtractor<Persona>() {
+							{
+								setNames(new String[] { "id", "nombre", "correo", "ip" });
+							}
+						});
+					}
+				}).build();
+	}
+
+	@Bean
+	public Step exportDB2CSVStep(JdbcCursorItemReader<Persona> personaDBItemReader) {
+		return stepBuilderFactory.get("exportDB2CSVStep")
+				.<Persona, Persona>chunk(100)
+				.reader(personaDBItemReader)
+				.writer(personaCSVItemWriter())
+				.build();
+	}
+
+	@Bean
+	public Job personasJob(PersonasJobListener listener, Step importCSV2DBStep1, 
+			Step exportDB2CSVStep) {
+		return jobBuilderFactory.get("personasJob")
 				.incrementer(new RunIdIncrementer())
-				.listener(listener)
+				//.listener(listener)
 				.start(importCSV2DBStep1)
+				.next(exportDB2CSVStep)
 				.build();
 	}
 
