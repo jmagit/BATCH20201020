@@ -61,5 +61,24 @@ public class PersonasBatchConfiguration {
 				.build();
 	}
 
-	
+	@Bean
+	public Step importCSV2DBStep1(JdbcBatchItemWriter<Persona> personaDBItemWriter) {
+		return stepBuilderFactory.get("importCSV2DBStep1")
+				.<PersonaDTO, Persona>chunk(10)
+				.reader(personaCSVItemReader("personas-1.csv"))
+				.processor(personaItemProcessor)
+				.writer(personaDBItemWriter)
+				.build();
+	}
+
+	@Bean
+	public Job personasJob(PersonasJobListener listener, Step importCSV2DBStep1) {
+		return jobBuilderFactory
+				.get("personasJob")
+				.incrementer(new RunIdIncrementer())
+				.listener(listener)
+				.start(importCSV2DBStep1)
+				.build();
+	}
+
 }
